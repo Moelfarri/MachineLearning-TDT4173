@@ -6,10 +6,11 @@ import pandas as pd
 
 class KMeans:
     
-    def __init__():
-        # NOTE: Feel free add any hyperparameters 
-        # (with defaults) as you see fit
-        pass
+    def __init__(self, K=2,iterations=100, centroids={}, classifications={} ):
+        self.K = K
+        self.iterations = iterations
+        self.centroids = centroids
+        self.classifications = classifications
         
     def fit(self, X):
         """
@@ -19,8 +20,42 @@ class KMeans:
             X (array<m,n>): a matrix of floats with
                 m rows (#samples) and n columns (#features)
         """
-        # TODO: Implement
-        raise NotImplemented()
+        X = np.array(X)
+        self.centroids = {}
+        
+        #initialize centroid positions
+        for i in range(self.K):
+            self.centroids[i] = X[i] #could also initialize is it at random
+        
+        #assign data to the centroids
+        for i in range(self.iterations):
+            self.classifications = {}
+            
+            #init classification array for centroids
+            for i in range(self.K):
+                self.classifications[i] = []
+            
+            for featureset in X:
+                distances = [np.linalg.norm(featureset-self.centroids[centroid]) for centroid in self.centroids]
+                classification = distances.index(min(distances))
+                self.classifications[classification].append(featureset)
+                
+            prev_centroids = dict(self.centroids)
+            
+            for classification in self.classifications:
+                self.centroids[classification] = np.average(self.classifications[classification], axis=0)
+            self.tol = 0.001
+            optimized = True
+            for c in self.centroids:
+                original_centroid = prev_centroids[c]
+                current_centroid = self.centroids[c]
+                if np.sum((current_centroid-original_centroid)/original_centroid*100.0) > self.tol:
+                    optimized = False
+            
+            if optimized:
+                break
+                
+                
     
     def predict(self, X):
         """
@@ -38,8 +73,10 @@ class KMeans:
             there are 3 clusters, then a possible assignment
             could be: array([2, 0, 0, 1, 2, 1, 1, 0, 2, 2])
         """
-        # TODO: Implement 
-        raise NotImplemented()
+        distances = [np.linalg.norm(X-self.centroids[centroid]) for centroid in self.centroids]
+        classification = distances.index(min(distances))
+        return classification
+        
     
     def get_centroids(self):
         """
@@ -56,7 +93,7 @@ class KMeans:
             [xm_1, xm_2, ..., xm_n]
         ])
         """
-        pass
+        return self.centroids
     
     
     
