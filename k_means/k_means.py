@@ -3,14 +3,58 @@ import pandas as pd
 # IMPORTANT: DO NOT USE ANY OTHER 3RD PARTY PACKAGES
 # (math, random, collections, functools, etc. are perfectly fine)
 
+
+import sys
+def initialize_centroids_kmeans_pp(data, k):
+    '''
+    initialized the centroids for K-means++
+    inputs:
+        data - numpy array of data points
+        k - number of clusters
+    '''
+    ## initialize the centroids list and add
+    ## a randomly selected data point to the list
+    centroids = []
+    centroids.append(data[np.random.randint(
+            data.shape[0]), :])
+
+    ## compute remaining k - 1 centroids
+    for c_id in range(k - 1):
+
+        ## initialize a list to store distances of data
+        ## points from nearest centroid
+        dist = []
+        for i in range(data.shape[0]):
+            point = data[i, :]
+            d = sys.maxsize
+
+            ## compute distance of 'point' from each of the previously
+            ## selected centroid and store the minimum distance
+            for j in range(len(centroids)):
+                temp_dist = euclidean_distance(point, centroids[j])
+                d = min(d, temp_dist)
+            dist.append(d)
+
+        ## select data point with maximum distance as our next centroid
+        dist = np.array(dist)
+        next_centroid = data[np.argmax(dist), :]
+        centroids.append(next_centroid)
+        dist = []
+    return centroids
+
+
+
 class KMeans:
     
-    def __init__(self, K=2,iterations=100):
+    def __init__(self, K=2,iterations=300, init="K-Means++", threshold=0.0001):
         self.K = K
         self.iterations = iterations
         self.centroids = []
         self.distances = []
+        self.init      = init
+        self.threshold = threshold
         
+    
     def fit(self, X):
         """
         Estimates parameters for the classifier
@@ -20,29 +64,49 @@ class KMeans:
                 m rows (#samples) and n columns (#features)
         """
         X = np.array(X).copy() 
-        idx = np.random.choice(len(X), self.K, replace=False)
         
+        #Init Centroids with one of the methods.
+        if self.init == "Random":
+            idx = np.random.choice(len(X), self.K, replace=False)
+            self.centroids = X[idx, :]
+            
+        elif self.init == "K-Means++":
+            self.centroids = initialize_centroids_kmeans_pp(X, self.K)
 
-        #Init Centroids Randomly
-        self.centroids = X[idx, :]
-
-        #Find the distance between centroids and all the data points
+        
+        
+        #Find the distance between centroids and all the data points       
         self.distances = np.concatenate([[euclidean_distance(X, centroid)] for centroid in self.centroids]).T
         
         #Assign datapoints to clusters based on minimum distance from Centroid
         point_cluster_assignment = np.array([np.argmin(i) for i in self.distances]) 
 
         #Repeating the above steps for a defined number of iterations
+        
+        prev_centroids_norm    = 0
+        current_centroids_norm = 0 
+
         for i in range(self.iterations): 
             self.centroids = []
+            prev_centroids_norm = current_centroids_norm
+            
             for idx in range(self.K):
                 #Updating Centroids by taking mean of Cluster it belongs to
                 temp_centroid = X[point_cluster_assignment==idx].mean(axis=0) 
                 self.centroids.append(temp_centroid)
-
-            self.centroids = np.vstack(self.centroids) #Updated Centroids  
+            
+            #Updated Centroids and distances
+            self.centroids = np.vstack(self.centroids) 
             self.distances = np.concatenate([[euclidean_distance(X, centroid)] for centroid in self.centroids]).T
             point_cluster_assignment = np.array([np.argmin(i) for i in self.distances])
+           
+            
+            #break algorithm if converged before for-loop iterations is over
+            current_centroids_norm = np.sum(euclidean_distance(self.centroids,0))
+            if self.threshold > np.abs(prev_centroids_norm-current_centroids_norm):
+                break
+            
+             
                 
                 
     
