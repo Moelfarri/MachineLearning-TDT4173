@@ -4,6 +4,12 @@ import pandas as pd
 # (math, random, collections, functools, etc. are perfectly fine)
 
 
+
+#https://www.kaggle.com/natevegh/decision-tree-from-scratch-theory-code-explained#Entropy---How-does-the-decision-tree-make-decisions?
+
+#https://www.youtube.com/watch?v=Bqi7EFFvNOg&ab_channel=PythonEngineer
+#https://www.youtube.com/watch?v=jVh5NA9ERDA&t=4s&ab_channel=PythonEngineer
+
 class DecisionTree:
     
     def __init__():
