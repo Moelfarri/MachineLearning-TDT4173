@@ -1,52 +1,50 @@
 import numpy as np 
-import pandas as pd 
+import pandas as pd
 # IMPORTANT: DO NOT USE ANY OTHER 3RD PARTY PACKAGES
 # (math, random, collections, functools, etc. are perfectly fine)
 
 
-import sys
-def initialize_centroids_kmeans_pp(data, k):
+
+def initialize_centroids_kmeans_pp(data, K):
     '''
     initialized the centroids for K-means++
     inputs:
         data - numpy array of data points
-        k - number of clusters
+        K - number of clusters
     '''
-    ## initialize the centroids list and add
-    ## a randomly selected data point to the list
-    centroids = []
-    centroids.append(data[np.random.randint(
-            data.shape[0]), :])
+    #initialize Centroid list and 
+    #Randomly select first Centroid
+    centroids = [data[np.random.choice(data.shape[0]), :]]
 
-    ## compute remaining k - 1 centroids
-    for c_id in range(k - 1):
-
-        ## initialize a list to store distances of data
-        ## points from nearest centroid
-        dist = []
+    ##Select remaining K - 1 Centroids
+    for _ in range(K - 1):
+        
+        # initialize a list to store distances of data
+        # points to nearest centroid
+        pointDistanceToCentroids = []
         for i in range(data.shape[0]):
             point = data[i, :]
-            d = sys.maxsize
-
-            ## compute distance of 'point' from each of the previously
-            ## selected centroid and store the minimum distance
+            d     = np.inf
+            
+            # compute distance of a point to each of the already
+            # selected centroids and store the minimum distance 
+            # to any of the existing centroids
             for j in range(len(centroids)):
                 temp_dist = euclidean_distance(point, centroids[j])
                 d = min(d, temp_dist)
-            dist.append(d)
-
-        ## select data point with maximum distance as our next centroid
-        dist = np.array(dist)
-        next_centroid = data[np.argmax(dist), :]
-        centroids.append(next_centroid)
-        dist = []
+            pointDistanceToCentroids.append(d)
+            
+        # select point that is farthest away from its nearest centroid as our next centroid initialization
+        pointDistanceToCentroids = np.array(pointDistanceToCentroids)
+        nextCentroid = data[np.argmax(pointDistanceToCentroids), :]
+        centroids.append(nextCentroid)
     return centroids
 
 
 
 class KMeans:
     
-    def __init__(self, K=2,iterations=300, init="K-Means++", threshold=0.0001):
+    def __init__(self, K=2, iterations=300, init="K-Means++", threshold=0.0001):
         self.K = K
         self.iterations = iterations
         self.centroids = []
