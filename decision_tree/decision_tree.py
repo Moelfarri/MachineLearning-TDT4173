@@ -19,20 +19,22 @@ class TreeNode():
         
     def isLeafNode(self):
         return self.value is not None
+
     
 class DecisionTree():
-    def __init__(self,  min_sample_split=2, max_tree_depth=np.inf):
+
+    def __init__(self,  min_sample_split=2, max_tree_depth=np.inf, min_info_gain = 0.0000001):
         self.root             = None
         self.max_tree_depth   = max_tree_depth
         self.min_sample_split = min_sample_split
-        
+        self.min_info_gain    = min_info_gain
         self.feature_columns  = None
         self.rules            = []
         
     def fit(self, X, y):
         """
         Generates a decision tree for classification
-        
+
         Args:
             X (pd.DataFrame): a matrix with discrete value where
                 each row is a sample and the columns correspond
@@ -46,61 +48,71 @@ class DecisionTree():
         
     
     def growTree(self, X, y, current_depth=0):
-        samples, features = X.shape
         
-        #if leaf is none
-        if not y.any():
-            return
+        
+        samples, features = X.shape
+        best_gain = 0
+        best_feature, best_threshold = None, None
+        left_idxs, right_idxs = None, None 
         
         #Termination conditions
-        if current_depth >= self.max_tree_depth or samples < self.min_sample_split or len(np.unique(y)) == 1:
-            most_common = np.unique(y, return_counts=True)[0][0]
-            leaf_value =  most_common
-            return TreeNode(value=leaf_value)
+        if current_depth <= self.max_tree_depth or samples > self.min_sample_split:
+            
+            #not necessary to initialze this at random but decided to do it
+            feature_idxs = np.random.choice(features, features, replace=False)
+            
+            #Select Best split at each node based on the best information gain
+            #iterate through every feature
+            for feature_idx in range(features):
+                
+                #values of that colum
+                split_idx, split_threshold = None, None
+                feature_values = X[:, feature_idx]
+                thresholds = np.unique(feature_values)
+                for threshold in thresholds:
+                    
+                    #Split based on threshold
+                    left_idxs_temp = np.argwhere(feature_values <= threshold).flatten()
+                    right_idxs_temp = np.argwhere(feature_values > threshold).flatten()
+                    if len(left_idxs_temp) > 0 and len(right_idxs_temp) > 0:
 
-        
-        #initiate features at random - will give different decision tree splits because the algorithm is greedy during information gain stage
-        feature_idxs = np.random.choice(features, features, replace=False)
-        
-        
-        
-        #Select Best split at each node based on the best information gain
-        best_gain = -np.inf
-        split_idx, split_threshold = None, None
-        for feature_idx in feature_idxs:
-            X_column = X[:, feature_idx]
-            thresholds = np.unique(X_column)
-            for threshold in thresholds:
-                info_gain = self.infoGain(X_column, threshold, y)
+                        #Calculate inmpurity
+                        info_gain = self.infoGain(feature_values, threshold, y)
 
-                if info_gain > best_gain:
-                    best_gain = info_gain
-                    split_idx = feature_idx
-                    split_threshold = threshold
+                        #keep track of features that gave largest infromation gain (entropy closer to 0)
+                        if info_gain > best_gain:
+                            best_gain = info_gain
+                            split_idx = feature_idx
+                            split_threshold = threshold
+                            
+                            best_feature, best_threshold = split_idx, split_threshold
+                            left_idxs = np.argwhere(X[:, best_feature] <= best_threshold).flatten()
+                            right_idxs = np.argwhere(X[:, best_feature] > best_threshold).flatten()
+        
+                
        
-        best_feature, best_threshold = split_idx, split_threshold
         
-      
-        left_idxs = np.argwhere(X[:, best_feature] <= best_threshold).flatten()
-        right_idxs = np.argwhere(X[:, best_feature] > best_threshold).flatten()
+        #create new branch if info gain is larger than min info gain
+        if best_gain > self.min_info_gain:
+            left = self.growTree(X[left_idxs, :], y[left_idxs], current_depth + 1)
+            right = self.growTree(X[right_idxs, :], y[right_idxs], current_depth + 1)
+            return TreeNode(best_feature, best_threshold, left, right)
         
-        
-        
-        left = self.growTree(X[left_idxs, :], y[left_idxs], current_depth + 1)
-        right = self.growTree(X[right_idxs, :], y[right_idxs], current_depth + 1)
-        
-        return TreeNode(best_feature, best_threshold, left, right)
-        
-        
-    def infoGain(self, X_column, threshold, y):
+        #At Leaf node - Get most common value
+        most_common = np.unique(y, return_counts=True)[0][np.argmax(np.unique(y, return_counts=True)[1])]
+        leaf_value =  most_common
+        return TreeNode(value=leaf_value)
+
+            
+    def infoGain(self, feature_values, threshold, y):
         
         # Parent node Entropy
         _, y_counts = np.unique(y, return_counts=True)
         parent_entropy = entropy(y_counts)
 
         # Split based on one of the feature thresholds
-        left_idxs = np.argwhere(X_column <= threshold).flatten()
-        right_idxs = np.argwhere(X_column > threshold).flatten()
+        left_idxs = np.argwhere(feature_values <= threshold).flatten()
+        right_idxs = np.argwhere(feature_values > threshold).flatten()
         
         if len(left_idxs) == 0 or len(right_idxs) == 0:
             return 0
@@ -119,30 +131,35 @@ class DecisionTree():
         information_gain = parent_entropy - child_entropy
         return information_gain
     
-       
     
     def predict(self, X):
         """
         Generates predictions
-        
+
         Note: should be called after .fit()
-        
+
         Args:
             X (pd.DataFrame): an mxn discrete matrix where
                 each row is a sample and the columns correspond
                 to the features.
-            
+
         Returns:
             A length m vector with predictions
         """
-        
+
         #Traverse the tree recursively
         #At each node look at the best split feature of the test feature vector x
         #and go left or right depending on x[feature_idx] <= threshold
-        
+
         #when we reach the leaf node we return the stored most common class label
         X = np.array(X).copy()
-        return np.array([self.traverseTree(data, self.root) for data in X])
+        y_pred = []
+        for data in X:
+            y_pred.append(self.traverseTree(data, self.root))
+            
+        return np.array(y_pred)
+        
+
         
     
     def traverseTree(self, data, node):
@@ -151,13 +168,10 @@ class DecisionTree():
             if data[node.feature] <= node.threshold:
                 if node.left != None:
                     node = node.left 
-                else:
-                    node = node.right
+
             else: 
                 if node.right != None:
                     node = node.right
-                else: 
-                    node = node.left
 
             
             
@@ -203,8 +217,14 @@ class DecisionTree():
 
     
     
-# --- Some utility functions 
     
+    
+    
+
+    
+
+    
+# --- Some utility functions 
 def accuracy(y_true, y_pred):
     """
     Computes discrete classification accuracy
@@ -216,6 +236,9 @@ def accuracy(y_true, y_pred):
     Returns:
         The average number of correct predictions
     """
+    y_true = np.array(y_true)
+    y_pred = y_pred.flatten()
+
     assert y_true.shape == y_pred.shape
     return (y_true == y_pred).mean()
 
@@ -241,6 +264,3 @@ def entropy(counts):
     probs = counts / counts.sum()
     probs = probs[probs > 0]  # Avoid log(0)
     return - np.sum(probs * np.log2(probs))
-
-
-
