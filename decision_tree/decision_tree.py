@@ -27,7 +27,7 @@ class DecisionTree():
         self.min_sample_split = min_sample_split
         
         self.feature_columns  = None
-        self.rules           = []
+        self.rules            = []
         
     def fit(self, X, y):
         """
@@ -43,18 +43,25 @@ class DecisionTree():
         X = np.array(X).copy()
         y = np.array(y).copy()
         self.root = self.growTree(X,y)
+        
     
     def growTree(self, X, y, current_depth=0):
         samples, features = X.shape
+        
+        #if leaf is none
+        if not y.any():
+            return
         
         #Termination conditions
         if current_depth >= self.max_tree_depth or samples < self.min_sample_split or len(np.unique(y)) == 1:
             most_common = np.unique(y, return_counts=True)[0][0]
             leaf_value =  most_common
             return TreeNode(value=leaf_value)
+
         
         #initiate features at random - will give different decision tree splits because the algorithm is greedy during information gain stage
         feature_idxs = np.random.choice(features, features, replace=False)
+        
         
         
         #Select Best split at each node based on the best information gain
@@ -69,17 +76,19 @@ class DecisionTree():
                 if info_gain > best_gain:
                     best_gain = info_gain
                     split_idx = feature_idx
-                    split_threshold = threshold      
+                    split_threshold = threshold
        
         best_feature, best_threshold = split_idx, split_threshold
         
-        
+      
         left_idxs = np.argwhere(X[:, best_feature] <= best_threshold).flatten()
         right_idxs = np.argwhere(X[:, best_feature] > best_threshold).flatten()
         
         
+        
         left = self.growTree(X[left_idxs, :], y[left_idxs], current_depth + 1)
         right = self.growTree(X[right_idxs, :], y[right_idxs], current_depth + 1)
+        
         return TreeNode(best_feature, best_threshold, left, right)
         
         
@@ -93,6 +102,8 @@ class DecisionTree():
         left_idxs = np.argwhere(X_column <= threshold).flatten()
         right_idxs = np.argwhere(X_column > threshold).flatten()
         
+        if len(left_idxs) == 0 or len(right_idxs) == 0:
+            return 0
 
         # compute the weighted avg. of the entropy for the children
         weight_left, weight_right = len(left_idxs)/len(y),  len(right_idxs)/len(y)
@@ -134,15 +145,22 @@ class DecisionTree():
         return np.array([self.traverseTree(data, self.root) for data in X])
         
     
-    
     def traverseTree(self, data, node):
         temp_rules = []
         while True:
             if data[node.feature] <= node.threshold:
-                node = node.left
+                if node.left != None:
+                    node = node.left 
+                else:
+                    node = node.right
             else: 
-                node = node.right
-                
+                if node.right != None:
+                    node = node.right
+                else: 
+                    node = node.left
+
+            
+            
             #Collecting all the rules during traversing
             if not node.isLeafNode():
                 temp_rules.append((self.feature_columns[node.feature], data[node.feature]))
@@ -154,6 +172,8 @@ class DecisionTree():
                 temp_rules = []
                 
                 return node.value
+    
+    
             
     
     def get_rules(self):
